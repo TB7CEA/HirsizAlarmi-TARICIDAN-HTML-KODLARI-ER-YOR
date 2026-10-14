@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>GÜVENLİK SİSTEMİ - ORÇUN YILMAZ ÇUBUK</title>
+    <style>
+        body {
+            background-color: #111;
+            color: white;
+            font-family: 'Arial Black', Gadget, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+        }
+        h1 { font-size: 45px; color: #00ffcc; margin-bottom: 5px; }
+        h2 { font-size: 25px; color: #fff; margin-bottom: 20px; }
+        #status { font-size: 30px; color: yellow; margin: 20px; }
+        .btn {
+            padding: 20px 40px;
+            font-size: 22px;
+            font-weight: bold;
+            background-color: #ff3333;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(255, 51, 51, 0.5);
+        }
+        .btn:hover { background-color: #cc0000; }
+        #sifre-alani { display: none; margin-top: 20px; }
+        input { font-size: 24px; padding: 10px; text-align: center; width: 150px; }
+        .btn-kapat { background-color: #33cc33; padding: 10px 20px; font-size: 18px; }
+    </style>
+</head>
+<body>
+
+    <h1>ORÇUN YILMAZ ÇUBUK</h1>
+    <h2>HIRSIZLIK ÖNLEME VE GÜVENLİK SİSTEMİ</h2>
+
+    <div id="status">DURUM: SİSTEM HAZIR</div>
+
+    <button id="armBtn" class="btn" onclick="kurAlarmi()">ALARMI ETKİNLEŞTİR (5 SN)</button>
+
+    <div id="sifre-alani">
+        <input type="password" id="sifreInput" placeholder="Şifre">
+        <button class="btn btn-kapat" onclick="kapatAlarm()">ALARMI SUSTUR</button>
+    </div>
+
+    <script>
+        let isArmed = false;
+        let alarmActive = false;
+        let audioCtx = null;
+        let osc = null;
+        let flashInterval = null;
+        const dogruSifre = "1234"; // ALARM KAPATMA ŞİFRESİ
+
+        function kurAlarmi() {
+            document.getElementById('armBtn').style.display = 'none';
+            let sayac = 5;
+            let statusDiv = document.getElementById('status');
+            
+            // Ses motorunu başlat (Tarayıcı izni için)
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+            let interval = setInterval(() => {
+                statusDiv.innerText = `SİSTEM KURULUYOR: ${sayac} SN\nLÜTFEN BİLGİSAYARDAN UZAKLAŞIN!`;
+                statusDiv.style.color = "orange";
+                sayac--;
+
+                if (sayac < 0) {
+                    clearInterval(interval);
+                    isArmed = true;
+                    statusDiv.innerText = "SİSTEM AKTİF!\n(BİLGİSAYARA DOKUNULDUĞU AN ALARM ÇALACAK)";
+                    statusDiv.style.color = "red";
+                    document.getElementById('sifre-alani').style.display = 'block';
+
+                    // Hareket Dinleyici Etkinleştir
+                    setTimeout(() => {
+                        window.addEventListener('mousemove', tetikleAlarm);
+                        window.addEventListener('keydown', tetikleAlarm);
+                    }, 500);
+                }
+            }, 1000);
+        }
+
+        function tetikleAlarm() {
+            if (!isArmed || alarmActive) return;
+            alarmActive = true;
+
+            // Tam Ekran Yap
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen();
+            }
+
+            // ÇOK YÜKSEK POLİS SİRENİ BAŞLAT
+            osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.type = 'sawtooth'; // Çok keskin ve yüksek ses frekansı
+            osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+
+            // Siren efekt modülasyonu
+            let sirenFreq = 600;
+            let up = true;
+            setInterval(() => {
+                if (!alarmActive) return;
+                if (up) {
+                    sirenFreq += 40;
+                    if (sirenFreq >= 1600) up = false;
+                } else {
+                    sirenFreq -= 40;
+                    if (sirenFreq <= 600) up = true;
+                }
+                osc.frequency.setValueAtTime(sirenFreq, audioCtx.currentTime);
+            }, 10);
+
+            gain.gain.setValueAtTime(1, audioCtx.currentTime); // MAKSİMUM SES
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+
+            // ÇAKAR RENK EFEKTİ
+            let colors = ['#ff0000', '#ffff00', '#000000', '#ffffff', '#0000ff'];
+            let colorIdx = 0;
+            let statusDiv = document.getElementById('status');
+
+            flashInterval = setInterval(() => {
+                document.body.style.backgroundColor = colors[colorIdx % colors.length];
+                statusDiv.innerHTML = "<h1 style='font-size:70px; color:black;'>!!! HIRSIZ VAR !!!<br>ORÇUN YILMAZ ÇUBUK</h1>";
+                colorIdx++;
+            }, 80);
+        }
+
+        function kapatAlarm() {
+            let girilen = document.getElementById('sifreInput').value;
+            if (girilen === dogruSifre) {
+                alarmActive = false;
+                isArmed = false;
+                clearInterval(flashInterval);
+                if (osc) osc.stop();
+                if (document.exitFullscreen) document.exitFullscreen();
+
+                document.body.style.backgroundColor = "#111";
+                document.getElementById('status').innerText = "DURUM: SİSTEM DEVRE DIŞI";
+                document.getElementById('status').style.color = "yellow";
+                document.getElementById('armBtn').style.display = 'inline-block';
+                document.getElementById('sifre-alani').style.display = 'none';
+                document.getElementById('sifreInput').value = "";
+                
+                window.removeEventListener('mousemove', tetikleAlarm);
+                window.removeEventListener('keydown', tetikleAlarm);
+                alert("Alarm Başarıyla Kapatıldı Orçun Bey.");
+            } else {
+                alert("YANLIŞ ŞİFRE!");
+                document.getElementById('sifreInput').value = "";
+            }
+        }
+    </script>
+</body>
+</html>
